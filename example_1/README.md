@@ -14,9 +14,19 @@ RailsでEvent SourcingとCQRSパターンを実装した本番環境対応のコ
 
 ```
 example_1/
+├── lib/
+│   └── event_sourcing/                    # Event Sourcingフレームワーク
+│       ├── event.rb                       # イベント基底クラス
+│       ├── aggregate_root.rb              # 集約ルート基底クラス
+│       ├── event_store.rb                 # Event Store実装
+│       └── repository.rb                  # リポジトリ
+│
 ├── app/
+│   ├── models/
+│   │   └── event_record.rb                # Event Store用ActiveRecord
+│   │
 │   ├── controllers/
-│   │   └── orders_controller.rb          # REST API エンドポイント
+│   │   └── orders_controller.rb           # REST API エンドポイント
 │   │
 │   ├── domain/                            # ドメイン層（書き込み側）
 │   │   └── orders/
@@ -35,36 +45,31 @@ example_1/
 │   │           ├── cancel_order.rb
 │   │           └── ship_order.rb
 │   │
-│   ├── event_sourcing/                    # Event Sourcingインフラ
-│   │   ├── event.rb                       # イベント基底クラス
-│   │   ├── ar_event_store.rb              # ActiveRecord Event Store
-│   │   ├── aggregate_root.rb              # 集約ルート基底クラス
-│   │   └── repository.rb                  # 集約リポジトリ
+│   ├── commands/
+│   │   └── command.rb                     # コマンド基底クラス
 │   │
 │   └── projections/                       # 読み取り側（CQRS）
-│       ├── models/                        # ActiveRecord Read Models
+│       ├── models/                        # Read Models (ActiveRecord)
 │       │   ├── order_summary_read_model.rb
 │       │   ├── order_details_read_model.rb
 │       │   └── order_item_read_model.rb
 │       ├── projectors/                    # イベントハンドラー
-│       │   ├── ar_order_summary_projector.rb
-│       │   └── ar_order_details_projector.rb
+│       │   ├── order_summary_projector.rb
+│       │   └── order_details_projector.rb
 │       └── queries/                       # クエリサービス
-│           └── ar_order_queries.rb
+│           └── order_queries.rb
 │
 ├── config/
 │   ├── initializers/
 │   │   └── event_sourcing.rb              # Event Sourcing初期化設定
 │   └── routes.rb                          # ルーティング設定
 │
-├── db/
-│   └── migrate/                           # マイグレーション
-│       ├── 20250101000001_create_event_store.rb
-│       ├── 20250101000002_create_order_summary_read_models.rb
-│       ├── 20250101000003_create_order_details_read_models.rb
-│       └── 20250101000004_create_order_item_read_models.rb
-│
-└── example_usage.rb                       # 動作確認用スクリプト（インメモリ版）
+└── db/
+    └── migrate/                           # マイグレーション
+        ├── 20250101000001_create_event_store.rb
+        ├── 20250101000002_create_order_summary_read_models.rb
+        ├── 20250101000003_create_order_details_read_models.rb
+        └── 20250101000004_create_order_item_read_models.rb
 ```
 
 ## セットアップ
@@ -320,7 +325,7 @@ namespace :event_sourcing do
     Projections::Models::OrderItemReadModel.delete_all
 
     # すべてのイベントを再生
-    EventSourcing::ArEventStore::EventRecord.order(:occurred_at).find_each do |record|
+    ::EventRecord.order(:occurred_at).find_each do |record|
       event_class = record.event_type.constantize
       event = event_class.from_h(record.event_data)
 
@@ -389,7 +394,7 @@ end
 ### イベントハンドラーのテスト
 
 ```ruby
-RSpec.describe Projections::Projectors::ArOrderSummaryProjector do
+RSpec.describe Projections::Projectors::OrderSummaryProjector do
   it "creates read model on OrderPlaced event" do
     event = Domain::Orders::Events::OrderPlaced.new(
       order_id: "ORDER-001",
@@ -398,9 +403,10 @@ RSpec.describe Projections::Projectors::ArOrderSummaryProjector do
       placed_at: Time.current
     )
 
+    projector = described_class.new
     projector.handle_event(event, {})
 
-    order = OrderSummaryReadModel.find_by(order_id: "ORDER-001")
+    order = Projections::Models::OrderSummaryReadModel.find_by(order_id: "ORDER-001")
     expect(order.customer_name).to eq("山田太郎")
   end
 end

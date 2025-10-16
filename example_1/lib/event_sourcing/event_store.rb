@@ -3,7 +3,7 @@
 module EventSourcing
   # ActiveRecord版のイベントストア
   # PostgreSQLなどのDBにイベントを永続化する
-  class ArEventStore
+  class EventStore
     def initialize
       @subscribers = []
     end
@@ -22,7 +22,7 @@ module EventSourcing
         end
 
         events.each_with_index do |event, index|
-          event_record = EventRecord.create!(
+          event_record = ::EventRecord.create!(
             aggregate_id: aggregate_id,
             aggregate_type: aggregate_type,
             event_type: event.class.name,
@@ -42,7 +42,7 @@ module EventSourcing
     # @param aggregate_type [String] 集約のタイプ
     # @return [Array<Hash>] イベントレコードのリスト
     def get_events(aggregate_id:, aggregate_type:)
-      EventRecord
+      ::EventRecord
         .where(aggregate_id: aggregate_id, aggregate_type: aggregate_type)
         .order(:version)
         .map { |record| record_to_hash(record) }
@@ -51,7 +51,7 @@ module EventSourcing
     # すべてのイベントを取得する
     # @return [Array<Hash>] すべてのイベントレコード
     def all_events
-      EventRecord
+      ::EventRecord
         .order(:occurred_at)
         .map { |record| record_to_hash(record) }
     end
@@ -66,7 +66,7 @@ module EventSourcing
 
     # 現在のバージョンを取得する
     def get_current_version(aggregate_id, aggregate_type)
-      EventRecord
+      ::EventRecord
         .where(aggregate_id: aggregate_id, aggregate_type: aggregate_type)
         .maximum(:version) || 0
     end
@@ -91,20 +91,5 @@ module EventSourcing
     end
 
     class ConcurrencyError < StandardError; end
-
-    # ActiveRecordモデル
-    class EventRecord < ApplicationRecord
-      self.table_name = "events"
-
-      validates :aggregate_id, presence: true
-      validates :aggregate_type, presence: true
-      validates :event_type, presence: true
-      validates :event_data, presence: true
-      validates :version, presence: true, numericality: { only_integer: true, greater_than: 0 }
-      validates :occurred_at, presence: true
-
-      # 集約とバージョンの組み合わせは一意
-      validates :version, uniqueness: { scope: [:aggregate_id, :aggregate_type] }
-    end
   end
 end

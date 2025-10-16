@@ -4,12 +4,12 @@
 # Rails起動時にこのファイルが読み込まれ、必要なコンポーネントを初期化します
 
 Rails.application.config.to_prepare do
-  # ActiveRecord Event Storeの初期化
-  $event_store = EventSourcing::ArEventStore.new
+  # Event Storeの初期化（lib/event_sourcing/から）
+  $event_store = EventSourcing::EventStore.new
 
-  # ActiveRecord Projectorsの初期化
-  summary_projector = Projections::Projectors::ArOrderSummaryProjector.new
-  details_projector = Projections::Projectors::ArOrderDetailsProjector.new
+  # Projectorsの初期化
+  summary_projector = Projections::Projectors::OrderSummaryProjector.new
+  details_projector = Projections::Projectors::OrderDetailsProjector.new
 
   # イベント購読の設定
   # Event Storeに保存されたイベントは自動的にProjectorsに通知される
@@ -31,5 +31,5 @@ Rails.application.config.to_prepare do
   )
 
   # クエリサービスの初期化（読み取り側）
-  $order_queries = Projections::Queries::ArOrderQueries.new
+  $order_queries = Projections::Queries::OrderQueries.new
 end
