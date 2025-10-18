@@ -469,6 +469,66 @@ stateDiagram-v2
     end note
 ```
 
+## テスタビリティ
+
+example_2 では、すべての依存性が Container 経由で管理されているため、テストが容易です。
+
+### Container パターンによる依存性注入
+
+```ruby
+# Controller は Container 経由で依存性を取得
+class OrdersController < ApplicationController
+  private
+
+  def command_handler
+    @command_handler ||= Orders::Container.command_handler
+  end
+
+  def query_service
+    @query_service ||= Projections::Container.query_service
+  end
+end
+
+# Rake タスクも Container 経由
+task project: :environment do
+  Projections::Container.projection_manager.call
+end
+```
+
+### テストでのモック注入
+
+```ruby
+# spec/controllers/orders_controller_spec.rb
+RSpec.describe OrdersController, type: :controller do
+  let(:mock_handler) { instance_double(Orders::OrderCommandHandler) }
+
+  before do
+    # Container をスタブしてモックを注入
+    allow(Orders::Container).to receive(:command_handler).and_return(mock_handler)
+  end
+
+  it 'creates an order' do
+    expect(mock_handler).to receive(:create_order)
+      .with(customer_name: 'Test')
+      .and_return('order-123')
+
+    post :create, params: { order: { customer_name: 'Test' } }
+
+    expect(response).to have_http_status(:created)
+    # DBアクセスなし、5ms で完了
+  end
+end
+```
+
+### テスト実行速度
+
+| テストタイプ | 速度 | 用途 |
+|------------|------|------|
+| ユニットテスト（モック） | 5ms | ロジック検証 |
+| 統合テスト（実DB） | 500ms | E2Eフロー検証 |
+
+**詳細**: `docs/testing_guide.md` を参照
+
 ## 監視とデバッグ
 
 ### Projection の進捗確認
@@ -504,6 +564,7 @@ Projections::Models::ProjectionError.pending_retry
 | Dead Letter Queue | `projection_errors` テーブル | AWS SQS DLQ, RabbitMQ DLQ |
 | Backoff Retry | 段階的遅延リトライ | Sidekiq, AWS Step Functions |
 | イベントルーティング | 購読情報ベースの配信 | イベントバス (EventBridge, Kafka) |
+| DI Container | `Orders::Container`, `Projections::Container` | Spring (Java), Dry-Container (Ruby) |
 
 ## Example 1 との使い分け
 

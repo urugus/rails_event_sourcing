@@ -64,21 +64,11 @@ class OrdersController < ApplicationController
   private
 
   def command_handler
-    @command_handler ||= Orders::OrderCommandHandler.new(repository: repository)
-  end
-
-  def repository
-    @repository ||= Orders::OrderRepository.new(event_store: event_store)
-  end
-
-  def event_store
-    @event_store ||= EventSourcing::EventStore.new(
-      event_mappings: Orders::EventMappings.build
-    )
+    @command_handler ||= Orders::Container.command_handler
   end
 
   def query_service
-    @query_service ||= Projections::Queries::OrderQueryService.new
+    @query_service ||= Projections::Container.query_service
   end
 
   def create_params

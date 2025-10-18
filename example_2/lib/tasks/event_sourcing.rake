@@ -1,35 +1,15 @@
 namespace :event_sourcing do
   desc "Run projections for all events"
   task project: :environment do
-    projectors = [
-      Projections::Projectors::OrderSummaryProjector.new,
-      Projections::Projectors::OrderDetailsProjector.new
-    ]
-
-    manager = Projections::ProjectionManager.new(
-      event_mappings: Orders::EventMappings.build,
-      projectors: projectors
-    )
-
     puts "Starting projection..."
-    manager.call
+    Projections::Container.projection_manager.call
     puts "Projection completed"
   end
 
   desc "Retry failed projections"
   task retry_failed: :environment do
-    projectors = [
-      Projections::Projectors::OrderSummaryProjector.new,
-      Projections::Projectors::OrderDetailsProjector.new
-    ]
-
-    manager = Projections::ProjectionManager.new(
-      event_mappings: Orders::EventMappings.build,
-      projectors: projectors
-    )
-
     puts "Retrying failed projections..."
-    manager.retry_failed_projections
+    Projections::Container.projection_manager.retry_failed_projections
     puts "Retry completed"
   end
 
