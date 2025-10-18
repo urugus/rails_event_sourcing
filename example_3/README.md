@@ -49,35 +49,57 @@
 
 ### アーキテクチャ図
 
-```
-┌────────────── 注文に商品追加リクエスト ──────────────┐
-│                                                      │
-│  OrderInventorySaga (Process Manager)               │
-│                                                      │
-│  ┌────────────────────────────────────────────┐    │
-│  │ 1. Inventory集約に在庫予約を指示          │    │
-│  │    ↓                                       │    │
-│  │    InventoryRepository.load(product_id)    │    │
-│  │    └→ イベントストアから再構築（最新状態）│    │
-│  │    ↓                                       │    │
-│  │    Inventory.reserve_stock()               │    │
-│  │    ├→ 在庫チェック（利用可能数 >= 要求数）│    │
-│  │    └→ StockReserved イベント発行          │    │
-│  │                                            │    │
-│  │ 2. 予約成功後、Order集約に商品追加         │    │
-│  │    ↓                                       │    │
-│  │    Order.add_item(reservation_id付き)      │    │
-│  │    └→ ItemAdded イベント発行               │    │
-│  └────────────────────────────────────────────┘    │
-│                                                      │
-│  エラー時: 補償トランザクション                      │
-│  └→ 予約をキャンセルしてロールバック                 │
-└──────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Request[注文に商品追加リクエスト]
 
-Read Model（InventoryReadModel）
-├─ 表示・検索用のみ
-├─ プロジェクター経由で非同期更新
-└─ ビジネスロジックには使用しない
+    subgraph Saga["OrderInventorySaga (Process Manager)"]
+        direction TB
+
+        subgraph Step1["ステップ1: 在庫予約"]
+            LoadInventory[InventoryRepository.load]
+            Reconstruct[イベントストアから再構築]
+            ReserveStock[Inventory.reserve_stock]
+            StockCheck{在庫チェック<br/>利用可能数 >= 要求数}
+            EmitReserved[StockReserved イベント発行]
+
+            LoadInventory --> Reconstruct
+            Reconstruct --> ReserveStock
+            ReserveStock --> StockCheck
+            StockCheck -->|成功| EmitReserved
+        end
+
+        subgraph Step2["ステップ2: 注文に商品追加"]
+            AddItem[Order.add_item<br/>reservation_id付き]
+            EmitItemAdded[ItemAdded イベント発行]
+
+            AddItem --> EmitItemAdded
+        end
+
+        EmitReserved --> AddItem
+
+        StockCheck -->|失敗| Compensation
+        AddItem -.->|エラー時| Compensation
+
+        Compensation[補償トランザクション:<br/>予約をキャンセルしてロールバック]
+    end
+
+    subgraph ReadModel["Read Model (参照のみ)"]
+        direction TB
+        InventoryReadModel[InventoryReadModel]
+        Purpose1[表示・検索用のみ]
+        Purpose2[プロジェクター経由で非同期更新]
+        Purpose3[ビジネスロジックには使用しない]
+
+        InventoryReadModel --- Purpose1
+        InventoryReadModel --- Purpose2
+        InventoryReadModel --- Purpose3
+    end
+
+    Request --> Saga
+    EmitReserved -.->|イベント| ReadModel
+    EmitItemAdded -.->|イベント| ReadModel
+
 ```
 
 ## ディレクトリ構造
