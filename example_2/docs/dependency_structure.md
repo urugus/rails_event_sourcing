@@ -3,7 +3,7 @@
 ## Container がない場合（Before）
 
 ```mermaid
-graph TD
+flowchart TD
     Controller[OrdersController]
     CommandHandler[OrderCommandHandler]
     Repository[OrderRepository]
@@ -33,7 +33,7 @@ graph TD
 ## Container がある場合（After）
 
 ```mermaid
-graph TD
+flowchart TD
     Controller[OrdersController]
     OrdersContainer[Orders::Container]
     ProjectionsContainer[Projections::Container]
@@ -178,7 +178,7 @@ end
 ## 依存関係の階層化
 
 ```mermaid
-graph LR
+flowchart TB
     subgraph "Presentation Layer"
         Controller[Controller]
     end
@@ -225,7 +225,7 @@ graph LR
 Containerは**ファサードパターン**を実装しています。
 
 ```mermaid
-graph TB
+flowchart TD
     subgraph "クライアント（簡潔なインターフェース）"
         Client[OrdersController]
     end
@@ -298,8 +298,20 @@ end
 ## 依存性逆転の原則（Dependency Inversion Principle）
 
 ```mermaid
-graph TB
-    subgraph "Before: 具象に依存"
+flowchart LR
+    subgraph After["After: 抽象に依存"]
+        ControllerAfter[Controller]
+        AbstractContainer["Container (抽象)"]
+        ConcreteContainer["Orders::Container (具象)"]
+        ConcreteHandlerAfter[OrderCommandHandler]
+
+        ControllerAfter -->|抽象に依存| AbstractContainer
+        AbstractContainer -.->|実装| ConcreteContainer
+
+        ConcreteContainer -.->|内部管理| ConcreteHandlerAfter
+    end
+
+    subgraph Before["Before: 具象に依存"]
         ControllerBefore[Controller]
         ConcreteHandler[OrderCommandHandler]
         ConcreteRepo[OrderRepository]
@@ -310,16 +322,6 @@ graph TB
         ControllerBefore -->|直接依存| ConcreteStore
     end
 
-    subgraph "After: 抽象に依存"
-        ControllerAfter[Controller]
-        AbstractContainer[Container<br/>抽象インターフェース]
-        ConcreteContainer[Orders::Container<br/>具象実装]
-
-        ControllerAfter -->|抽象に依存| AbstractContainer
-        AbstractContainer <-.実装.- ConcreteContainer
-
-        ConcreteContainer -.->|内部管理| ConcreteHandler
-    end
 ```
 
 **DIP準拠:**
